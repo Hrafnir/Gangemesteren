@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Multiplier Dash — Gangetrening 1–15</title>
+  <style>
+    :root{
+      --bg:#0e0f14; --panel:#141826; --accent:#4bf2a8; --accent-2:#6ea8ff; --text:#eaf1ff; --muted:#9ab0d1; --danger:#ff6b6b; --gold:#ffd166;
+      --shadow: 0 10px 24px rgba(0,0,0,.35), 0 2px 8px rgba(0,0,0,.25);
+      --radius: 16px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      color:var(--text);
+      background: radial-gradient(1200px 800px at 20% -10%, #1b2240 0%, transparent 60%),
+                  radial-gradient(900px 600px at 100% 0%, #13352e 0%, transparent 60%),
+                  linear-gradient(180deg, #0b0d12 0%, #0e1017 40%, #0b0d12 100%);
+    }
+    .wrap{max-width:1100px;margin:0 auto;padding:24px}
+    header{display:flex;align-items:center;gap:16px;margin:8px 0 20px}
+    .logo{width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent-2));box-shadow:var(--shadow);display:grid;place-items:center;font-weight:900;color:#0b0d12}
+    h1{font-size:clamp(22px,3.4vw,34px);margin:0}
+    .sub{color:var(--muted);font-size:14px}
+
+    .grid{display:grid;gap:18px}
+    @media(min-width:900px){.grid{grid-template-columns: 380px 1fr}}
+
+    .card{background:rgba(20,24,38,.82); backdrop-filter: blur(10px); border:1px solid rgba(255,255,255,.06); border-radius:var(--radius); box-shadow:var(--shadow)}
+    .card .head{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.06)}
+    .card .head h2{font-size:18px;margin:0}
+    .card .body{padding:16px}
+
+    .row{display:flex;gap:12px;flex-wrap:wrap}
+
+    .pill{display:inline-flex;align-items:center;gap:10px;padding:10px 12px;border-radius:999px;background:#0f1321;border:1px solid rgba(255,255,255,.08);color:var(--muted)}
+    .seg{display:flex;border-radius:999px;overflow:hidden;border:1px solid rgba(255,255,255,.08)}
+    .seg button{background:#0f1321;color:var(--muted);border:0;padding:10px 14px;cursor:pointer}
+    .seg button.active{background:linear-gradient(135deg,rgba(75,242,168,.2),rgba(110,168,255,.2)); color:var(--text)}
+
+    .tables{display:grid;grid-template-columns: repeat(5, 1fr);gap:8px}
+    .tables label{display:flex;align-items:center;justify-content:center;gap:6px;padding:10px;background:#0f1321;border:1px solid rgba(255,255,255,.08);border-radius:10px;cursor:pointer;color:var(--muted)}
+    .tables input{accent-color:var(--accent)}
+
+    .big{font-size:clamp(34px,5.5vw,54px);font-weight:800;letter-spacing:.5px}
+    .question{display:grid;place-items:center;height:150px;border-radius:14px;background:linear-gradient(135deg,rgba(75,242,168,.1),rgba(110,168,255,.08)); border:1px solid rgba(255,255,255,.08)}
+
+    .kbd{display:grid;grid-template-columns: repeat(3, 1fr);gap:10px}
+    .kbd button{padding:16px 0;font-size:20px;border-radius:12px;border:1px solid rgba(255,255,255,.08); background:#0f1321;color:var(--text);cursor:pointer}
+    .kbd button:active{transform:translateY(1px)}
+
+    .actions{display:flex;gap:10px;flex-wrap:wrap}
+    .btn{padding:12px 16px;border-radius:12px;border:1px solid rgba(255,255,255,.08);background:linear-gradient(180deg,#12172a,#0e1426);color:var(--text);cursor:pointer}
+    .btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#061018;font-weight:800}
+    .btn.ghost{background:#0f1321}
+    .btn.warn{background:linear-gradient(135deg,#ffb3b3,#ff7b7b);color:#2d0b0b}
+
+    .stats{display:flex;gap:14px;flex-wrap:wrap}
+    .chip{background:#0f1321;border:1px solid rgba(255,255,255,.08);padding:10px 12px;border-radius:12px;color:var(--muted)}
+    .chip b{color:var(--text)}
+
+    .hint{margin-top:10px;padding:12px 14px;border-radius:12px;background:#0e1522;border:1px dashed rgba(255,255,255,.14);color:#bfe8ff}
+    .hint.hidden{display:none}
+
+    .bar{height:10px;border-radius:999px;background:#0b0f1a;border:1px solid rgba(255,255,255,.08);overflow:hidden}
+    .bar>span{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-2));width:0%}
+
+    .right{color:#3df29b}
+    .wrong{color:var(--danger)}
+
+    .footer{margin-top:18px;color:var(--muted);font-size:13px;text-align:center}
+
+    .summary{display:none}
+    .summary.show{display:block}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:10px;border-bottom:1px solid rgba(255,255,255,.06);text-align:left}
+    tr:nth-child(even){background:rgba(255,255,255,.02)}
+
+    .lvl{padding:6px 10px;border-radius:999px;background:rgba(255,255,255,.08);font-weight:700}
+    .lvl.rekrutt{color:#8bd3ff}
+    .lvl.pro{color:#4bf2a8}
+    .lvl.master{color:#ffd166}
+
+    /* Nice focus for inputs */
+    input[type="text"]{width:100%;padding:12px 14px;font-size:22px;border-radius:12px;border:1px solid rgba(255,255,255,.1);background:#0b0f1a;color:var(--text)}
+    input[type="text"]:focus{outline:2px solid rgba(75,242,168,.5)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="logo">×</div>
+      <div>
+        <h1>Multiplier Dash <span style="opacity:.7;font-size:.8em">— gangetrening 1–15</span></h1>
+        <div class="sub">Sporty trening med smarte strategier og gamification. Norsk UI.</div>
+      </div>
+    </header>
+
+    <div class="grid">
+      <!-- LEFT: Settings / Summary -->
+      <section class="card" id="settingsCard">
+        <div class="head"><h2>Oppsett</h2><button class="btn ghost" id="resetStatsBtn" title="Nullstill lagret historikk">Nullstill historikk</button></div>
+        <div class="body">
+          <div class="row" style="align-items:center;justify-content:space-between">
+            <div class="pill">Oppgaver pr runde
+              <div class="seg" style="margin-left:10px">
+                <button data-n="10" class="active segN">10</button>
+                <button data-n="15" class="segN">15</button>
+                <button data-n="20" class="segN">20</button>
+              </div>
+            </div>
+            <div class="pill">Tallområde
+              <div class="seg" style="margin-left:10px">
+                <button data-max="10" class="segMax">1–10</button>
+                <button data-max="12" class="segMax">1–12</button>
+                <button data-max="15" class="active segMax">1–15</button>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top:14px">
+            <div class="sub" style="margin-bottom:8px">Velg tabeller å trene (minst én)</div>
+            <div class="tables" id="tables"></div>
+          </div>
+
+          <div class="row" style="margin-top:14px">
+            <label class="pill"><input id="smartFocus" type="checkbox" checked> Smart fokus på svake kombinasjoner</label>
+            <label class="pill"><input id="showTimer" type="checkbox" checked> Vis tidsbonus</label>
+          </div>
+
+          <div class="actions" style="margin-top:16px">
+            <button class="btn primary" id="startBtn">Start runde</button>
+            <button class="btn" id="exportBtn">Eksporter økt (CSV)</button>
+          </div>
+
+          <div class="footer">Tips: Sliter du? Bruk <b>Tenk smart 💡</b> underveis for strategier som <i>5×n + n</i>, <i>10×n − n</i>, eller oppdeling.</div>
+        </div>
+      </section>
+
+      <!-- RIGHT: Game panel -->
+      <section class="card" id="gameCard">
+        <div class="head"><h2>Spill</h2>
+          <div class="stats">
+            <div class="chip">Score: <b id="score">0</b></div>
+            <div class="chip">Streak: <b id="streak">0</b></div>
+            <div class="chip">Tidsbonus: <b id="bonus">0</b></div>
+            <div class="chip">Nivå: <span class="lvl rekrutt" id="level">Rekrutt</span></div>
+          </div>
+        </div>
+        <div class="body">
+          <div class="question">
+            <div class="big"><span id="a">–</span> × <span id="b">–</span> = <span style="opacity:.6">?</span></div>
+          </div>
+
+          <div class="row" style="margin-top:14px">
+            <div style="flex:1;min-width:220px">
+              <input type="text" inputmode="numeric" pattern="[0-9]*" id="answer" placeholder="Skriv svar…" />
+              <div class="hint hidden" id="hint"></div>
+              <div class="row" style="margin-top:10px">
+                <button class="btn" id="hintBtn">Tenk smart 💡</button>
+                <button class="btn ghost" id="skipBtn">Hopp over</button>
+                <button class="btn primary" id="submitBtn">Sjekk</button>
+              </div>
+            </div>
+
+            <div style="width:280px;max-width:100%">
+              <div class="kbd" id="kbd"></div>
+            </div>
+          </div>
+
+          <div style="margin-top:14px">
+            <div class="sub" style="margin-bottom:6px">Rundeprogresjon</div>
+            <div class="bar"><span id="progress"></span></div>
+          </div>
+
+          <div class="summary" id="summary">
+            <h3 style="margin-top:16px">Oppsummering</h3>
+            <div class="row" style="margin-bottom:10px">
+              <div class="chip">Riktige: <b id="sumRight">0</b></div>
+              <div class="chip">Feil: <b id="sumWrong">0</b></div>
+              <div class="chip">Snitttid: <b id="avgTime">0.0s</b></div>
+            </div>
+            <div id="weak"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    // ---------- Utilities & Storage ----------
+    const $ = sel => document.querySelector(sel);
+    const $$ = sel => [...document.querySelectorAll(sel)];
+    const storageKey = 'mdash_stats_v1';
+
+    const Stats = {
+      load(){
+        try{ return JSON.parse(localStorage.getItem(storageKey)) || {} }catch{ return {} }
+      },
+      save(obj){ localStorage.setItem(storageKey, JSON.stringify(obj)) },
+      bump(pair, right, time){
+        const key = pair.join('×');
+        const all = this.load();
+        all[key] = all[key] || { seen:0, right:0, wrong:0, best:null, last:Date.now() };
+        all[key].seen++;
+        if(right) all[key].right++; else all[key].wrong++;
+        if(time!=null) all[key].best = (all[key].best==null? time : Math.min(all[key].best, time));
+        all[key].last = Date.now();
+        this.save(all);
+      },
+      difficult(max){
+        // Return up to 6 hardest pairs within range 1..max using error rate & recency
+        const all = this.load();
+        const entries = Object.entries(all)
+          .map(([k,v])=>{
+            const [a,b]=k.split('×').map(Number);
+            if(a>max || b>max) return null;
+            const attempts = v.seen||1; const error = (v.wrong||0)/attempts;
+            const recency = (Date.now()- (v.last||0))/ (1000*60*60*24); // days
+            const score = error*0.7 + Math.min(recency/14,1)*0.3; // blend error + stale
+            return {a,b, score, err:error, seen:attempts}
+          })
+          .filter(Boolean)
+          .sort((x,y)=>y.score - x.score);
+        return entries.slice(0,6);
+      }
+    }
+
+    // ---------- Build table checkboxes ----------
+    function buildTables(max=15){
+      const host = $('#tables');
+      host.innerHTML = '';
+      for(let n=1;n<=max;n++){
+        const id = 't'+n;
+        const el = document.createElement('label');
+        el.innerHTML = `<input type="checkbox" id="${id}" checked> ${n}-gangen`;
+        host.appendChild(el);
+      }
+    }
+    buildTables(15);
+
+    // ---------- Seg controls ----------
+    let roundCount = 10; let maxN = 15;
+    $$('.segN').forEach(b=>b.onclick=()=>{ $$('.segN').forEach(x=>x.classList.remove('active')); b.classList.add('active'); roundCount = +b.dataset.n;});
+    $$('.segMax').forEach(b=>b.onclick=()=>{ $$('.segMax').forEach(x=>x.classList.remove('active')); b.classList.add('active'); maxN = +b.dataset.max; buildTables(maxN)});
+
+    // ---------- Game State ----------
+    let state = {
+      a: null, b: null, answer:'',
+      score:0, streak:0, qIndex:0, qTotal: roundCount,
+      startTime:0, timer:null, lastTime:0,
+      history:[], // {a,b, correct, time}
+      selected: new Set([...Array(15).keys()].map(i=>i+1))
+    };
+
+    function selectedTables(){
+      const ids = $$('#tables input:checked').map(x=>+x.id.slice(1));
+      return new Set(ids);
+    }
+
+    function levelName(score){
+      if(score<1500) return ['Rekrutt','rekrutt'];
+      if(score<4000) return ['Pro','pro'];
+      return ['Master','master'];
+    }
+
+    function updateHUD(){
+      $('#score').textContent = state.score;
+      $('#streak').textContent = state.streak;
+      $('#bonus').textContent = Math.round(Math.max(0, 200 - state.lastTime*100));
+      const [name,cls]=levelName(state.score);
+      const el=$('#level'); el.textContent = name; el.className = `lvl ${cls}`;
+      $('#progress').style.width = `${(state.qIndex/state.qTotal)*100}%`;
+    }
+
+    function randChoice(arr){ return arr[Math.floor(Math.random()*arr.length)] }
+
+    function makeQuestion(){
+      const tables = selectedTables();
+      const useSmart = $('#smartFocus').checked;
+      // possibly bias towards difficult combos
+      let candidates=[];
+      if(useSmart){
+        candidates = Stats.difficult(maxN).filter(x=>tables.has(x.a) || tables.has(x.b));
+      }
+      let a,b;
+      if(candidates.length && Math.random()<0.6){
+        ({a,b} = randChoice(candidates));
+      } else {
+        const picked = [...tables];
+        a = randChoice(picked);
+        b = Math.floor(Math.random()*maxN)+1;
+      }
+      // normalize: smaller first for storage consistency doesn't matter in gameplay
+      state.a=a; state.b=b; state.answer=''; $('#answer').value='';
+      $('#a').textContent=a; $('#b').textContent=b; $('#hint').classList.add('hidden');
+      state.startTime = performance.now();
+      updateHUD();
+    }
+
+    // ---------- Hints / Strategies ----------
+    function hintFor(a,b){
+      const m=a*b;
+      const n = (a>=b)?a:b, k=(a>=b)?b:a; // think n×k with n>=k for wording
+      const ideas=[];
+      if(n===10){ ideas.push(`Bruk 10-gangen: 10×${k} = ${10*k}.`); }
+      if(n===9){ ideas.push(`Tenk 10×${k} − ${k} = ${10*k} − ${k}.`); }
+      if(n===8){ ideas.push(`Tenk 10×${k} − 2×${k} = ${10*k} − ${2*k}.`); }
+      if(n===7){ ideas.push(`Tenk 5×${k} + 2×${k} = ${5*k} + ${2*k}.`); }
+      if(n===6){ ideas.push(`Tenk 5×${k} + ${k} = ${5*k} + ${k}.`); }
+      if(n===12){ ideas.push(`Tenk 10×${k} + 2×${k} = ${10*k} + ${2*k}.`); }
+      if(n===11){ ideas.push(`Tenk 10×${k} + ${k} = ${10*k} + ${k}.`); }
+      if(k%2===0){ ideas.push(`Dobling: ${n}×${k} = ${n}×(${k/2}×2) = (${n}×${k/2})×2.`); }
+      if(n-k<=2 && n>k){ ideas.push(`Nær ${n}: (${n}−${n-k})×${k} = ${n}×${k} − ${(n-k)}×${k}.`); }
+      ideas.push(`Oppdeling: ${n}×${k} = (${n-1})×${k} + ${k}.`);
+      // Produce first two distinct ideas
+      return ideas.slice(0,2).join('\n');
+    }
+
+    // ---------- Check / Submit ----------
+    function submit(answerStr){
+      const t = (performance.now() - state.startTime)/1000; state.lastTime=t;
+      const correct = (+answerStr === state.a*state.b);
+      const speedBonus = Math.max(0, 200 - t*100); // declines after 2s
+      let delta = 0;
+      if(correct){
+        state.streak++; delta = 100 + Math.round(speedBonus) + state.streak*10;
+      } else {
+        state.streak=0; delta = -50; // small penalty
+      }
+      state.score += delta;
+      state.history.push({a:state.a,b:state.b, correct, time:+t.toFixed(2)});
+      Stats.bump([state.a,state.b], correct, t);
+      updateHUD();
+      // flash feedback
+      const q = document.querySelector('.question');
+      q.style.boxShadow = correct? '0 0 0 2px rgba(61,242,155,.45) inset' : '0 0 0 2px rgba(255,107,107,.45) inset';
+      setTimeout(()=>q.style.boxShadow='none', 260);
+
+      state.qIndex++;
+      if(state.qIndex>=state.qTotal){ finishRound(); }
+      else { makeQuestion(); }
+    }
+
+    function finishRound(){
+      $('#progress').style.width = '100%';
+      const right = state.history.filter(x=>x.correct).length;
+      const wrong = state.history.length - right;
+      const avg = state.history.reduce((s,x)=>s+x.time,0)/state.history.length;
+      $('#sumRight').textContent = right;
+      $('#sumWrong').textContent = wrong;
+      $('#avgTime').textContent = avg.toFixed(2)+'s';
+      // find weak facts
+      const misses = state.history.filter(x=>!x.correct);
+      const slow = state.history.filter(x=>x.correct).sort((a,b)=>b.time-a.time).slice(0,5);
+      const host = $('#weak');
+      let html='';
+      if(misses.length){
+        html += '<h4>Øv mer på disse</h4><table><tr><th>Stykke</th><th>Riktig svar</th></tr>';
+        misses.forEach(m=>{html += `<tr><td>${m.a}×${m.b}</td><td>${m.a*m.b}</td></tr>`});
+        html += '</table>';
+      }
+      if(slow.length){
+        html += '<h4>Tregest (selv om riktig)</h4><table><tr><th>Stykke</th><th>Tid</th></tr>';
+        slow.forEach(m=>{html += `<tr><td>${m.a}×${m.b}</td><td>${m.time.toFixed(2)}s</td></tr>`});
+        html += '</table>';
+      }
+      host.innerHTML = html || '<div class="sub">Ingen spesielle svakheter i denne runden — bra jobbet!</div>';
+      $('#summary').classList.add('show');
+      // scroll to summary on small screens
+      document.getElementById('summary').scrollIntoView({behavior:'smooth'});
+    }
+
+    // ---------- Keyboard ----------
+    function buildKbd(){
+      const keys=['7','8','9','4','5','6','1','2','3','←','0','OK'];
+      const kbd=$('#kbd'); kbd.innerHTML='';
+      keys.forEach(k=>{
+        const b=document.createElement('button'); b.textContent=k; kbd.appendChild(b);
+        b.onclick=()=>{
+          if(k==='OK'){ submit($('#answer').value); return; }
+          if(k==='←'){ $('#answer').value = $('#answer').value.slice(0,-1); return; }
+          $('#answer').value += k;
+          $('#answer').focus();
+        }
+      })
+    }
+
+    // ---------- Export CSV ----------
+    function exportCSV(){
+      if(!state.history.length){ alert('Ingen økt å eksportere ennå. Spill en runde først.'); return; }
+      const rows = [['a','b','correct','time_s']].concat(state.history.map(h=>[h.a,h.b,h.correct?1:0,h.time]));
+      const csv = rows.map(r=>r.join(',')).join('\n');
+      const url = URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+      const a=document.createElement('a'); a.href=url; a.download='multiplier_dash_okt.csv'; a.click(); URL.revokeObjectURL(url);
+    }
+
+    // ---------- Bindings ----------
+    buildKbd();
+
+    $('#startBtn').onclick=()=>{
+      const picked = selectedTables();
+      if(!picked.size){ alert('Velg minst én tabell.'); return; }
+      state = { a:null,b:null,answer:'', score:0, streak:0, qIndex:0, qTotal: roundCount, startTime:0, timer:null, lastTime:0, history:[], selected:picked };
+      $('#summary').classList.remove('show');
+      makeQuestion(); updateHUD();
+    }
+
+    $('#submitBtn').onclick=()=> submit($('#answer').value);
+    $('#skipBtn').onclick=()=>{ state.history.push({a:state.a,b:state.b, correct:false, time:0}); state.streak=0; state.qIndex++; (state.qIndex>=state.qTotal)? finishRound(): makeQuestion(); updateHUD(); };
+    $('#hintBtn').onclick=()=>{ const h=hintFor(state.a,state.b); const box=$('#hint'); box.textContent=h; box.classList.remove('hidden'); };
+    $('#exportBtn').onclick=exportCSV;
+    $('#resetStatsBtn').onclick=()=>{ if(confirm('Slette lokal historikk/statistikk?')) localStorage.removeItem(storageKey) };
+
+    $('#answer').addEventListener('keydown', (e)=>{
+      if(e.key==='Enter'){ submit($('#answer').value); }
+    });
+
+    // Timer bonus display updater (visual only)
+    setInterval(()=>{
+      if(state.startTime){
+        const t=(performance.now()-state.startTime)/1000; state.lastTime=t; $('#bonus').textContent = Math.round(Math.max(0,200-t*100));
+      }
+    }, 100);
+  </script>
+</body>
+</html>
