@@ -83,7 +83,6 @@
     .lvl.pro{color:#4bf2a8}
     .lvl.master{color:#ffd166}
 
-    /* Nice focus for inputs */
     input[type="text"]{width:100%;padding:12px 14px;font-size:22px;border-radius:12px;border:1px solid rgba(255,255,255,.1);background:#0b0f1a;color:var(--text)}
     input[type="text"]:focus{outline:2px solid rgba(75,242,168,.5)}
   </style>
@@ -190,15 +189,13 @@
   </div>
 
   <script>
-    // ---------- Utilities & Storage ----------
+    // ---------- Helpers & Storage ----------
     const $ = sel => document.querySelector(sel);
     const $$ = sel => [...document.querySelectorAll(sel)];
-    const storageKey = 'mdash_stats_v1';
+    const storageKey = 'mdash_stats_v2';
 
     const Stats = {
-      load(){
-        try{ return JSON.parse(localStorage.getItem(storageKey)) || {} }catch{ return {} }
-      },
+      load(){ try{ return JSON.parse(localStorage.getItem(storageKey)) || {} }catch{ return {} } },
       save(obj){ localStorage.setItem(storageKey, JSON.stringify(obj)) },
       bump(pair, right, time){
         const key = pair.join('×');
@@ -210,32 +207,22 @@
         all[key].last = Date.now();
         this.save(all);
       },
-      difficult(max){
-        // Return up to 6 hardest pairs within range 1..max using error rate & recency
+      difficultyScore(a,b){
         const all = this.load();
-        const entries = Object.entries(all)
-          .map(([k,v])=>{
-            const [a,b]=k.split('×').map(Number);
-            if(a>max || b>max) return null;
-            const attempts = v.seen||1; const error = (v.wrong||0)/attempts;
-            const recency = (Date.now()- (v.last||0))/ (1000*60*60*24); // days
-            const score = error*0.7 + Math.min(recency/14,1)*0.3; // blend error + stale
-            return {a,b, score, err:error, seen:attempts}
-          })
-          .filter(Boolean)
-          .sort((x,y)=>y.score - x.score);
-        return entries.slice(0,6);
+        const key = `${a}×${b}`; const v = all[key];
+        if(!v) return 0; // unseen
+        const attempts = v.seen||1; const error = (v.wrong||0)/attempts;
+        const recency = (Date.now()- (v.last||0))/ (1000*60*60*24);
+        return error*0.7 + Math.min(recency/14,1)*0.3;
       }
     }
 
-    // ---------- Build table checkboxes ----------
+    // ---------- UI builders ----------
     function buildTables(max=15){
-      const host = $('#tables');
-      host.innerHTML = '';
+      const host = $('#tables'); host.innerHTML = '';
       for(let n=1;n<=max;n++){
-        const id = 't'+n;
         const el = document.createElement('label');
-        el.innerHTML = `<input type="checkbox" id="${id}" checked> ${n}-gangen`;
+        el.innerHTML = `<input type="checkbox" id="t${n}" checked> ${n}-gangen`;
         host.appendChild(el);
       }
     }
@@ -248,11 +235,12 @@
 
     // ---------- Game State ----------
     let state = {
-      a: null, b: null, answer:'',
-      score:0, streak:0, qIndex:0, qTotal: roundCount,
-      startTime:0, timer:null, lastTime:0,
-      history:[], // {a,b, correct, time}
-      selected: new Set([...Array(15).keys()].map(i=>i+1))
+      a:null,b:null,answer:'',
+      score:0, streak:0, qIndex:0, qTotal:roundCount,
+      startTime:0, lastTime:0,
+      deck:[], // list of {a,b}
+      history:[],
+      selected:new Set([...Array(15).keys()].map(i=>i+1))
     };
 
     function selectedTables(){
@@ -275,35 +263,65 @@
       $('#progress').style.width = `${(state.qIndex/state.qTotal)*100}%`;
     }
 
-    function randChoice(arr){ return arr[Math.floor(Math.random()*arr.length)] }
-
-    function makeQuestion(){
+    // ---------- Deck generation (variasjon uten repetisjon) ----------
+    function buildDeck(){
       const tables = selectedTables();
       const useSmart = $('#smartFocus').checked;
-      // possibly bias towards difficult combos
-      let candidates=[];
+      const pairs = [];
+      // tolking: valgt tabell = første faktor (a) velges fra disse; b fra 1..maxN
+      for(const a of tables){
+        for(let b=1;b<=maxN;b++) pairs.push({a,b});
+      }
+      // ranger etter vanskelighet hvis smart, ellers tilfeldig
       if(useSmart){
-        candidates = Stats.difficult(maxN).filter(x=>tables.has(x.a) || tables.has(x.b));
-      }
-      let a,b;
-      if(candidates.length && Math.random()<0.6){
-        ({a,b} = randChoice(candidates));
+        pairs.sort((p,q)=> Stats.difficultyScore(q.a,q.b) - Stats.difficultyScore(p.a,p.b));
+        // bland de 60% vanskeligste lett, resten mer lett blandet for variasjon
+        const cut = Math.max(1, Math.floor(pairs.length*0.6));
+        const hard = pairs.slice(0,cut);
+        const rest = shuffle(pairs.slice(cut));
+        state.deck = interleave(hard.slice(0, roundCount*0.6|0), rest);
       } else {
-        const picked = [...tables];
-        a = randChoice(picked);
-        b = Math.floor(Math.random()*maxN)+1;
+        state.deck = shuffle(pairs);
       }
-      // normalize: smaller first for storage consistency doesn't matter in gameplay
-      state.a=a; state.b=b; state.answer=''; $('#answer').value='';
-      $('#a').textContent=a; $('#b').textContent=b; $('#hint').classList.add('hidden');
-      state.startTime = performance.now();
+      // klipp til rundestørrelse, uten direkte duplikater
+      const seen=new Set();
+      const unique=[];
+      for(const p of state.deck){
+        const key=`${p.a}×${p.b}`;
+        if(!seen.has(key)){ unique.push(p); seen.add(key); }
+        if(unique.length>=roundCount) break;
+      }
+      // hvis vi ikke fikk nok (for få valgte tabeller), fyll på med ekstra shuffle
+      while(unique.length<roundCount){
+        for(const p of shuffle(pairs)){
+          const key=`${p.a}×${p.b}`;
+          if(!seen.has(key)){ unique.push(p); seen.add(key); }
+          if(unique.length>=roundCount) break;
+        }
+      }
+      state.deck = unique;
+    }
+
+    function shuffle(arr){ const a=[...arr]; for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]] } return a }
+    function interleave(a,b){
+      const out=[]; let i=0,j=0;
+      while(i<a.length || j<b.length){ if(i<a.length) out.push(a[i++]); if(j<b.length) out.push(b[j++]); }
+      return out;
+    }
+
+    // ---------- Question flow ----------
+    function nextFromDeck(){
+      const item = state.deck[state.qIndex];
+      if(!item){ finishRound(); return; }
+      state.a=item.a; state.b=item.b; state.answer=''; $('#answer').value=''; $('#hint').classList.add('hidden');
+      $('#a').textContent=state.a; $('#b').textContent=state.b;
+      state.startTime=performance.now();
       updateHUD();
     }
 
-    // ---------- Hints / Strategies ----------
+    // ---------- Hints ----------
     function hintFor(a,b){
-      const m=a*b;
-      const n = (a>=b)?a:b, k=(a>=b)?b:a; // think n×k with n>=k for wording
+      const n=(a>=b)?a:b, k=(a>=b)?b:a; // n>=k
       const ideas=[];
       if(n===10){ ideas.push(`Bruk 10-gangen: 10×${k} = ${10*k}.`); }
       if(n===9){ ideas.push(`Tenk 10×${k} − ${k} = ${10*k} − ${k}.`); }
@@ -313,86 +331,86 @@
       if(n===12){ ideas.push(`Tenk 10×${k} + 2×${k} = ${10*k} + ${2*k}.`); }
       if(n===11){ ideas.push(`Tenk 10×${k} + ${k} = ${10*k} + ${k}.`); }
       if(k%2===0){ ideas.push(`Dobling: ${n}×${k} = ${n}×(${k/2}×2) = (${n}×${k/2})×2.`); }
-      if(n-k<=2 && n>k){ ideas.push(`Nær ${n}: (${n}−${n-k})×${k} = ${n}×${k} − ${(n-k)}×${k}.`); }
+      if(n-k<=2 && n>k){ ideas.push(`Nær ${n}: ${n}×${k} − ${(n-k)}×${k}.`); }
       ideas.push(`Oppdeling: ${n}×${k} = (${n-1})×${k} + ${k}.`);
-      // Produce first two distinct ideas
-      return ideas.slice(0,2).join('\n');
+      return ideas.slice(0,2).join('
+');
     }
 
-    // ---------- Check / Submit ----------
-    function submit(answerStr){
-      const t = (performance.now() - state.startTime)/1000; state.lastTime=t;
-      const correct = (+answerStr === state.a*state.b);
-      const speedBonus = Math.max(0, 200 - t*100); // declines after 2s
-      let delta = 0;
-      if(correct){
-        state.streak++; delta = 100 + Math.round(speedBonus) + state.streak*10;
-      } else {
-        state.streak=0; delta = -50; // small penalty
-      }
+    // ---------- Submit ----------
+    function submit(val){
+      const ans = String(val??$('#answer').value).trim();
+      if(!ans){ $('#answer').focus(); return; }
+      const t=(performance.now()-state.startTime)/1000; state.lastTime=t;
+      const correct=(+ans === state.a*state.b);
+      const speedBonus = Math.max(0, 200 - t*100);
+      let delta=0; if(correct){ state.streak++; delta=100 + Math.round(speedBonus) + state.streak*10; } else { state.streak=0; delta=-50; }
       state.score += delta;
       state.history.push({a:state.a,b:state.b, correct, time:+t.toFixed(2)});
       Stats.bump([state.a,state.b], correct, t);
-      updateHUD();
-      // flash feedback
-      const q = document.querySelector('.question');
-      q.style.boxShadow = correct? '0 0 0 2px rgba(61,242,155,.45) inset' : '0 0 0 2px rgba(255,107,107,.45) inset';
-      setTimeout(()=>q.style.boxShadow='none', 260);
+
+      const qEl=document.querySelector('.question');
+      qEl.style.boxShadow = correct? '0 0 0 2px rgba(61,242,155,.45) inset' : '0 0 0 2px rgba(255,107,107,.45) inset';
+      setTimeout(()=>qEl.style.boxShadow='none', 220);
 
       state.qIndex++;
       if(state.qIndex>=state.qTotal){ finishRound(); }
-      else { makeQuestion(); }
+      else { nextFromDeck(); }
+      updateHUD();
     }
 
     function finishRound(){
-      $('#progress').style.width = '100%';
-      const right = state.history.filter(x=>x.correct).length;
-      const wrong = state.history.length - right;
-      const avg = state.history.reduce((s,x)=>s+x.time,0)/state.history.length;
-      $('#sumRight').textContent = right;
-      $('#sumWrong').textContent = wrong;
-      $('#avgTime').textContent = avg.toFixed(2)+'s';
-      // find weak facts
-      const misses = state.history.filter(x=>!x.correct);
-      const slow = state.history.filter(x=>x.correct).sort((a,b)=>b.time-a.time).slice(0,5);
-      const host = $('#weak');
-      let html='';
-      if(misses.length){
-        html += '<h4>Øv mer på disse</h4><table><tr><th>Stykke</th><th>Riktig svar</th></tr>';
-        misses.forEach(m=>{html += `<tr><td>${m.a}×${m.b}</td><td>${m.a*m.b}</td></tr>`});
-        html += '</table>';
-      }
-      if(slow.length){
-        html += '<h4>Tregest (selv om riktig)</h4><table><tr><th>Stykke</th><th>Tid</th></tr>';
-        slow.forEach(m=>{html += `<tr><td>${m.a}×${m.b}</td><td>${m.time.toFixed(2)}s</td></tr>`});
-        html += '</table>';
-      }
+      $('#progress').style.width='100%';
+      const right=state.history.filter(x=>x.correct).length; const wrong=state.history.length-right;
+      const avg=state.history.reduce((s,x)=>s+x.time,0)/(state.history.length||1);
+      $('#sumRight').textContent=right; $('#sumWrong').textContent=wrong; $('#avgTime').textContent=avg.toFixed(2)+'s';
+      const misses=state.history.filter(x=>!x.correct);
+      const slow=state.history.filter(x=>x.correct).sort((a,b)=>b.time-a.time).slice(0,5);
+      const host=$('#weak'); let html='';
+      if(misses.length){ html += '<h4>Øv mer på disse</h4><table><tr><th>Stykke</th><th>Riktig svar</th></tr>' + misses.map(m=>`<tr><td>${m.a}×${m.b}</td><td>${m.a*m.b}</td></tr>`).join('') + '</table>'; }
+      if(slow.length){ html += '<h4>Tregest (selv om riktig)</h4><table><tr><th>Stykke</th><th>Tid</th></tr>' + slow.map(m=>`<tr><td>${m.a}×${m.b}</td><td>${m.time.toFixed(2)}s</td></tr>`).join('') + '</table>'; }
       host.innerHTML = html || '<div class="sub">Ingen spesielle svakheter i denne runden — bra jobbet!</div>';
       $('#summary').classList.add('show');
-      // scroll to summary on small screens
       document.getElementById('summary').scrollIntoView({behavior:'smooth'});
     }
 
-    // ---------- Keyboard ----------
+    // ---------- Keypad & Keyboard ----------
     function buildKbd(){
       const keys=['7','8','9','4','5','6','1','2','3','←','0','OK'];
       const kbd=$('#kbd'); kbd.innerHTML='';
       keys.forEach(k=>{
-        const b=document.createElement('button'); b.textContent=k; kbd.appendChild(b);
-        b.onclick=()=>{
-          if(k==='OK'){ submit($('#answer').value); return; }
-          if(k==='←'){ $('#answer').value = $('#answer').value.slice(0,-1); return; }
-          $('#answer').value += k;
-          $('#answer').focus();
-        }
+        const b=document.createElement('button');
+        b.type='button'; b.setAttribute('role','button'); b.textContent=k; kbd.appendChild(b);
+        b.addEventListener('click',()=>{
+          if(k==='OK'){ submit(); return; }
+          if(k==='←'){ $('#answer').value = $('#answer').value.slice(0,-1); $('#answer').focus(); return; }
+          $('#answer').value += k; $('#answer').focus();
+        });
+        // touchend fallback for enkelte mobiler
+        b.addEventListener('touchend',(e)=>{ e.preventDefault(); b.click(); }, {passive:false});
       })
     }
+
+    // Global tastaturstøtte (Enter sender inn uansett fokus)
+    document.addEventListener('keydown',(e)=>{
+      if(e.key==='Enter'){
+        e.preventDefault(); submit();
+      }
+      // tillat tall direkte-skriving når fokus ikke er i input
+      if(/^[0-9]$/.test(e.key) && document.activeElement!==$('#answer')){
+        $('#answer').value += e.key; $('#answer').focus();
+      }
+      if(e.key==='Backspace' && document.activeElement!==$('#answer')){
+        $('#answer').value = $('#answer').value.slice(0,-1);
+      }
+    });
 
     // ---------- Export CSV ----------
     function exportCSV(){
       if(!state.history.length){ alert('Ingen økt å eksportere ennå. Spill en runde først.'); return; }
       const rows = [['a','b','correct','time_s']].concat(state.history.map(h=>[h.a,h.b,h.correct?1:0,h.time]));
-      const csv = rows.map(r=>r.join(',')).join('\n');
+      const csv = rows.map(r=>r.join(',')).join('
+');
       const url = URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
       const a=document.createElement('a'); a.href=url; a.download='multiplier_dash_okt.csv'; a.click(); URL.revokeObjectURL(url);
     }
@@ -403,27 +421,24 @@
     $('#startBtn').onclick=()=>{
       const picked = selectedTables();
       if(!picked.size){ alert('Velg minst én tabell.'); return; }
-      state = { a:null,b:null,answer:'', score:0, streak:0, qIndex:0, qTotal: roundCount, startTime:0, timer:null, lastTime:0, history:[], selected:picked };
+      state = { a:null,b:null,answer:'', score:0, streak:0, qIndex:0, qTotal: roundCount, startTime:0, lastTime:0, deck:[], history:[], selected:picked };
       $('#summary').classList.remove('show');
-      makeQuestion(); updateHUD();
+      buildDeck();
+      nextFromDeck();
+      updateHUD();
+      $('#answer').focus();
     }
 
-    $('#submitBtn').onclick=()=> submit($('#answer').value);
-    $('#skipBtn').onclick=()=>{ state.history.push({a:state.a,b:state.b, correct:false, time:0}); state.streak=0; state.qIndex++; (state.qIndex>=state.qTotal)? finishRound(): makeQuestion(); updateHUD(); };
+    $('#submitBtn').onclick=()=> submit();
+    $('#skipBtn').onclick=()=>{ state.history.push({a:state.a,b:state.b, correct:false, time:0}); state.streak=0; state.qIndex++; (state.qIndex>=state.qTotal)? finishRound(): nextFromDeck(); updateHUD(); };
     $('#hintBtn').onclick=()=>{ const h=hintFor(state.a,state.b); const box=$('#hint'); box.textContent=h; box.classList.remove('hidden'); };
     $('#exportBtn').onclick=exportCSV;
     $('#resetStatsBtn').onclick=()=>{ if(confirm('Slette lokal historikk/statistikk?')) localStorage.removeItem(storageKey) };
 
-    $('#answer').addEventListener('keydown', (e)=>{
-      if(e.key==='Enter'){ submit($('#answer').value); }
-    });
+    $('#answer').addEventListener('keydown',(e)=>{ if(e.key==='Enter'){ e.preventDefault(); submit(); } });
 
-    // Timer bonus display updater (visual only)
-    setInterval(()=>{
-      if(state.startTime){
-        const t=(performance.now()-state.startTime)/1000; state.lastTime=t; $('#bonus').textContent = Math.round(Math.max(0,200-t*100));
-      }
-    }, 100);
+    // Bonus-visning (kun UI)
+    setInterval(()=>{ if(state.startTime){ const t=(performance.now()-state.startTime)/1000; state.lastTime=t; $('#bonus').textContent=Math.round(Math.max(0,200-t*100)); } }, 100);
   </script>
 </body>
 </html>
